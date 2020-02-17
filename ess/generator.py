@@ -144,7 +144,11 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
 
     matlab_engine = matlab.engine.start_matlab("-nosplash")
 
-    matlab_engine.addpath(eeg_path)
+    try:
+        matlab_engine.addpath(eeg_path)
+    except Exception as e:
+        print("Error importing EEGLAB. Check your EEGLAB installation path in 'config.json'")
+        raise e
     matlab_engine.addpath(os.path.join(os.path.dirname(os.path.abspath(__file__))), 'ess')
 
     print('Loading EEGLAB...')
