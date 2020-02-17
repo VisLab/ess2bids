@@ -366,7 +366,7 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
                                     current_label].channels
                                 channels_dict[channel] = dict()
                                 channels_dict[channel]['type'] = modality
-                                channels_dict[channel]['units'] = 'µV'
+                                channels_dict[channel]['units'] = u'µV'
                                 channels_dict[channel]['sampling_frequency'] = mode['Sampling Rate']
                                 # stubbed, since all channels have the same reference, so this only goes in the sidecar...channels_dict[channel]['reference'] = mode['Reference Label']
 
