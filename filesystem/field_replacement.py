@@ -44,7 +44,7 @@ def replace_fields(bids_path, stub=False):
                 if 'type' in updated and updated['type'] not in channel_types:
                     warning_list.append("Channel type is invalid per BIDS EEG specification for channel label %s" % channel_label)
 
-                for entities in _where(project, **change['where']):
+                for entities in _where(project, change.get('where')):
                     if 'scan' in entities:
                         project.subjects[entities['subject']].sessions[entities['session']].scans[entities['scan']].channels[channel_label].update(updated)
                         change_list.add(
@@ -117,7 +117,7 @@ def replace_fields(bids_path, stub=False):
                 else:
                     if not isinstance(change['where'], dict):
                         fail_list.append("Malformed field replacement entry in %s" % task_label)
-                    for entities in _where(project, **change['where']):
+                    for entities in _where(project, change['where']):
                         updated = {k: v for (k, v) in change.items() if not (k == 'where' or k == 'rename')}
                         for field, field_value in updated.items():
                             project.tasks[task_label].add_field(field, field_value, entities.get('subject'), entities.get('session'), entities.get('scan'))
@@ -162,21 +162,21 @@ def replace_fields(bids_path, stub=False):
         raise IOError("Failed to export BIDS study", *e.args)
 
 
-def _where(project: BIDSProject, **kwargs):
+def _where(project: BIDSProject, kwargs):
     """
     Internal function used to decide which subject, session, and/or scans correspond with a given set of key/value pairs
 
     * Each entry in **kwargs correspond to a given key/value pair in 'participants.tsv' and '_sessions.tsv'
 
     :param project: BIDSProject used to probe key-value pairs
-    :param kwargs: Each key-value pair that can be associated with a given subject, session, or scan
+    :param kwargs: Dictionary where key-value pair that can be associated with a given subject, session, or scan
     :return:
     """
     primary_keys = ('participant_id', 'session_id', 'filename')
     entries = list()
     for subject_label, subject in project.subjects.items():
         for session_label, session in subject.sessions.items():
-            if kwargs == {k: v for (k,v) in kwargs.items() if (session.fields.get(k) == v or (k == 'session_id' and v == 'ses-' + session_label)) or (subject.fields.get(k) == v or (k == 'participant_id' and v == 'sub-' + subject_label))}:
+            if not kwargs or (kwargs == {k: v for (k,v) in kwargs.items() if (session.fields.get(k) == v or (k == 'session_id' and v == 'ses-' + session_label)) or (subject.fields.get(k) == v or (k == 'participant_id' and v == 'sub-' + subject_label))}):
                 entries.append({'subject': subject_label, 'session':session_label})
 
     return entries
