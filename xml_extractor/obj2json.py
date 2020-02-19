@@ -2,7 +2,7 @@ import json
 
 # next 4 functions to turn obj lists to dicts
 
-incorrect_NAs = ("NA", 'NaN', None)
+incorrect_NAs = ("NA", 'NaN', '', None)
 
 def sessionlist2dict(sessionlist):
     ret = dict()
@@ -35,8 +35,3 @@ def RPSlist2dict(RPSlist):
 
 def scrub_na(d):
     return {k:(v if v not in incorrect_NAs else "n/a") for k,v in d.items()}
-
-def dict2json(sessionsdict, filepath):
-    string = json.dumps(sessionsdict)
-    with open(filepath, "w") as file:
-        file.write(string)

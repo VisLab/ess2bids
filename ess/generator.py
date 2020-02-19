@@ -18,7 +18,8 @@ from ess.definitions import *
 from structure.project import BIDSProject, channel_types
 from structure.task import BIDSTask
 from structure.subject import BIDSSession, BIDSScan, BIDSSubject
-from xml_extractor.ess2obj import *
+from xml_extractor.deprecated.ess2obj import *
+from xml_extractor.ess2obj import extract_description
 from xml_extractor.obj2json import *
 
 DISPLAY_VALS = None
@@ -39,6 +40,11 @@ def generate_bids_project(input_directory, eeg_path, verbose=False) -> BIDSProje
 
     DISPLAY_MATLAB_OUTPUT = verbose
     DISPLAY_VALS = verbose
+
+    try:
+        full_xml = extract_description(os.path.join(input_directory, "study_description.xml"))
+    except Exception as e:
+        raise LXMLDecodeError(input_directory, e)
 
     try:
         header_dict = xml2head(os.path.join(input_directory, "study_description.xml")).todict()
@@ -165,8 +171,7 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
                 bids_file.tasks[task_name] = BIDSTask()
                 bids_file.tasks[task_name].add_field("TaskName", task_name)
 
-            for subject_key in session['Subjects'].keys():
-                subject = session['Subjects'][subject_key]
+            for subject_key, subject in session['Subjects'].items():
 
                 if subject['Lab ID'] not in subject_dict.keys():
                     subject_num += 1
@@ -179,8 +184,7 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
                     bids_file.subjects[subject_id] = BIDSSubject()
 
                     for field in subject.keys():
-                        if field.lower().replace(" ", "_") in participant_level_tags.keys() and subject[field] != "NA" and \
-                                subject[field] != "":
+                        if field.lower().replace(" ", "_") in participant_level_tags.keys() and subject[field] != "n/a":
                             bids_file.subjects[subject_id].fields[field.lower().replace(" ", "_")] = subject[field]
                             bids_file.field_definitions[field.lower().replace(" ", "_")] = participant_level_tags[
                                 field.lower().replace(" ", "_")]
@@ -211,31 +215,31 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
                     bids_file.subjects[subject_id].sessions[session_id].fields['ESS_subjectLabID'] = subject['Lab ID']
                     bids_file.subjects[subject_id].field_definitions['ESS_subjectLabID'] = session_level_tags['ESS_subjectLabID']
 
-                    if session.get('Number') and session['Number'] != "NA":
+                    if session.get('Number') and session['Number'] != "n/a":
                         bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionNum'] = session['Number']
                         bids_file.subjects[subject_id].field_definitions['ESS_sessionNum'] = session_level_tags['ESS_sessionNum']
 
                     # TODO: this will likely have to be scan specific
-                    if session.get('Lab ID') and session['Lab ID'] != "NA":
+                    if session.get('Lab ID') and session['Lab ID'] != "n/a":
                         bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionID'] = session['Lab ID']
                         bids_file.subjects[subject_id].field_definitions['ESS_sessionID'] = session_level_tags[
                             'ESS_sessionID']
 
-                    if session.get('In Session Number') and session['In Session Number'] != 'NA':
+                    if session.get('In Session Number') and session['In Session Number'] != 'n/a':
                         bids_file.subjects[subject_id].sessions[session_id].fields['ESS_inSessionRecordingNum'] = session['In Session Number']
                         bids_file.subjects[subject_id].field_definitions['ESS_inSessionRecordingNum'] = session_level_tags['ESS_inSessionRecordingNum']
 
                     if subject.get('Medication'):
-                        if subject['Medication'].get('Caffeine') and subject['Medication'].get('Caffeine') != 'NA':
+                        if subject['Medication'].get('Caffeine') and subject['Medication'].get('Caffeine') != 'n/a':
                             bids_file.subjects[subject_id].sessions[session_id].fields['caffeine'] = subject['Medication']['Caffeine']
                             bids_file.subjects[subject_id].field_definitions['caffeine'] = session_level_tags['caffeine']
 
-                        if subject['Medication'].get('Alcohol') and subject['Medication']['Alcohol'] != 'NA':
+                        if subject['Medication'].get('Alcohol') and subject['Medication']['Alcohol'] != 'n/a':
                             bids_file.subjects[subject_id].sessions[session_id].fields['alcohol'] = subject['Medication']['Alcohol']
                             bids_file.subjects[subject_id].field_definitions['alcohol'] = session_level_tags['alcohol']
 
                     for field in subject.keys():
-                        if session_level_tags.get(field) and subject[field] and subject[field] != "NA" and subject[field] != "":
+                        if session_level_tags.get(field) and subject[field] and subject[field] != "n/a" and subject[field] != "":
                             bids_file.subjects[subject_id].sessions[session_id].fields[field.lower().replace(" ", "_")] = \
                                 subject[field]
                             bids_file.subjects[subject_id].field_definitions[field.lower().replace(" ", "_")] = \
