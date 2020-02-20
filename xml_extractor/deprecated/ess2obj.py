@@ -1,5 +1,5 @@
 from lxml import etree
-from xml_extractor.ClassDef import *
+from xml_extractor.deprecated.ClassDef import *
 
 parser = etree.XMLParser(encoding='utf-8')
 

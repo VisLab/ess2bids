@@ -1,7 +1,7 @@
 import json
 from abc import abstractmethod, ABC
 
-from xml_extractor.obj2json import scrub_na
+from xml_extractor.deprecated.obj2json import scrub_na
 
 
 class ESS2BIDS(ABC):

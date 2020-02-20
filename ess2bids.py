@@ -16,6 +16,7 @@ import argparse
 
 from filesystem.export import export_project
 from ess.generator import *
+from ess.deprecated.generator import generate_bids_project as old_generate_bids_project
 from ess.replacer import replacer_delete, replacer_make
 import matlab.engine
 import sys
@@ -44,20 +45,28 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('input', type=str)
-    parser.add_argument('output', type=str)
-    parser.add_argument('-s', '--stub', action='store_true')
-    parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('input', type=str, help="input directory for top-level ESS study")
+    parser.add_argument('output', type=str, help="output path for BIDS study")
+    parser.add_argument('-s', '--stub', action='store_true', help="if set, doesn't copy over large files, and only generates metadata")
+    parser.add_argument('-v', '--verbose', action='store_true', help="if set, generates additional logs for metadata extraction and generation")
+    parser.add_argument('-l', '--legacy', action='store_true', help="if set, uses deprecated ESS converter")
 
     args = parser.parse_args()
 
     try:
         try:
-            bids_file = generate_bids_project(os.path.abspath(args.input), config['EEGLAB installation path'], verbose=args.verbose)
+            if args.legacy:
+                bids_file = old_generate_bids_project(os.path.abspath(args.input), config['EEGLAB installation path'], verbose=args.verbose)
+            else:
+                bids_file = generate_bids_project(os.path.abspath(args.input), config['EEGLAB installation path'], verbose=args.verbose)
         except LXMLDecodeError:
             print(f'There was an error with {args.input}. Attempting to fix encoding errors...')
             replacer_make(args.input)
-            bids_file = generate_bids_project(os.path.abspath(args.input), config['EEGLAB installation path'], verbose=args.verbose)
+            if args.legacy:
+                bids_file = old_generate_bids_project(os.path.abspath(args.input), config['EEGLAB installation path'],
+                                                      verbose=args.verbose)
+            else:
+                bids_file = generate_bids_project(os.path.abspath(args.input), config['EEGLAB installation path'], verbose=args.verbose)
         finally:
             replacer_delete(args.input)
     except LXMLDecodeError:

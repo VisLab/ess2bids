@@ -38,7 +38,9 @@ def _xml2sessions(sessions):
     sessions_dict = dict()
     for session in sessions:
         key = session.findtext('number')
-        current_session = sessions_dict[key] = dict()
+        if key not in sessions_dict:
+            sessions_dict[key] = list()
+        current_session = dict()
 
         current_session['Task Label'] = session.findtext('taskLabel')
         current_session['Lab ID'] = session.findtext('labId')
@@ -48,6 +50,8 @@ def _xml2sessions(sessions):
         # notes = session.find('notes')
         current_session['Notes'] = ''
         current_session['Data Recordings'] = _data_recordings_from_session_xml(session.find('dataRecordings').findall('dataRecording'))
+
+        sessions_dict[key].append(current_session)
 
     return sessions_dict
 
@@ -86,6 +90,7 @@ def _data_recordings_from_session_xml(data_recordings):
         current_data_recording = data_recordings_dict[key] = dict()
 
         current_data_recording['Filename'] = data_recording.findtext('filename')
+        current_data_recording['Data Recording UUID'] = data_recording.findtext('dataRecordingUuid')
         current_data_recording['Start Date Time'] = data_recording.findtext('startDateTime')
         current_data_recording['Recording Parameter Set Label'] = data_recording.findtext('recordingParameterSetLabel')
         current_data_recording['Event Instance File'] = data_recording.findtext('eventInstanceFile')
@@ -143,9 +148,9 @@ def _xml2eventcodes(event_codes):
         current_event_code['Task Label'] = event_code.findtext('taskLabel') or ''
 
         try:
-            current_event_code['No. Instances'] = int(event_code.findtext('numberOfInstances'))
+            current_event_code['No. instances'] = int(event_code.findtext('numberOfInstances'))
         except AttributeError:
-            current_event_code['No. Instances'] = 1 # TODO: shouldn't this be 0?
+            current_event_code['No. instances'] = 1 # TODO: shouldn't this be 0?
 
         condition = event_code.find('condition')
         current_event_code['HED Tag'] = condition.findtext('tag')

@@ -18,7 +18,9 @@ from ess.definitions import *
 from structure.project import BIDSProject, channel_types
 from structure.task import BIDSTask
 from structure.subject import BIDSSession, BIDSScan, BIDSSubject
-from xml_extractor.ess2obj import extract_description
+from xml_extractor.deprecated.ess2obj import *
+# from xml_extractor.ess2obj import extract_description
+from xml_extractor.deprecated.obj2json import *
 
 DISPLAY_VALS = None
 DISPLAY_MATLAB_OUTPUT = None
@@ -39,12 +41,17 @@ def generate_bids_project(input_directory, eeg_path, verbose=False) -> BIDSProje
     DISPLAY_MATLAB_OUTPUT = verbose
     DISPLAY_VALS = verbose
 
+    # try:
+    #     full_xml = extract_description(os.path.join(input_directory, "study_description.xml"))
+    # except Exception as e:
+    #     raise LXMLDecodeError(input_directory, e)
+
     try:
-        full_xml = extract_description(os.path.join(input_directory, "study_description.xml"))
+        header_dict = xml2head(os.path.join(input_directory, "study_description.xml")).todict()
     except IOError:
         try:
             input_directory = os.path.join(input_directory, "Level1/")
-            full_xml = extract_description(os.path.join(input_directory, "study_description.xml"))
+            header_dict = xml2head(os.path.join(input_directory, "study_description.xml")).todict()
         except (IOError, OSError):
             raise IOError("ESS project directory doesn't contain 'study_description.xml'")
         except Exception as e:
@@ -52,20 +59,23 @@ def generate_bids_project(input_directory, eeg_path, verbose=False) -> BIDSProje
     except Exception as e:
         raise LXMLDecodeError(input_directory, e)
 
-    header = full_xml['head']
-
     bids_file = BIDSProject(os.path.basename(input_directory))
-    bids_file.init_dataset_description(header['Title'], header['Study License'],
-                                       funding=[header['Funding Organization']])
+    bids_file.init_dataset_description(header_dict['Title'], header_dict['Study License'],
+                                       funding=[header_dict['Funding Organization'],])
     bids_file.original_path = input_directory
-    bids_file.readme = f"Description: {header['Description']}\nLegacy UUID: {header['UUID']}\n"
+    bids_file.readme = f"Description: {header_dict['Description']}\nLegacy UUID: {header_dict['UUID']}\n"
     bids_file.changes = "1.0.0 - %s\n - Initial Release" % datetime.date.today()
 
     print("Reading project %s..." % input_directory)
-    _generate_bids_sessions(bids_file, full_xml, input_directory, eeg_path)
-    _generate_bids_tasks(bids_file, full_xml)
+    _generate_bids_sessions(bids_file, input_directory, eeg_path)
+    _generate_bids_tasks(bids_file, input_directory)
 
-    for event_code in full_xml['event_codes']:
+    try:
+        event_codes = eventcodelist2dict(xml2eventcodelist(os.path.join(input_directory, "study_description.xml")))
+    except Exception as e:
+        raise LXMLDecodeError(input_directory, e)
+
+    for event_code in event_codes.values():
         if event_code['No. instances'] == 0:
             pass
         elif event_code['Task Label'] and bids_file.tasks[underscore_to_camelcase(event_code['Task Label'])]:
@@ -114,7 +124,7 @@ def generate_report(bids_file: BIDSProject) -> str:
     return report
 
 
-def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
+def _generate_bids_sessions(bids_file, input_directory, eeg_path):
     """
     Internal function used to pick apart each session of a given ESS study, and map it to BIDS
 
@@ -123,6 +133,10 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
     :param eeg_path: Filepath for the installation of EEGLAB
     :return:
     """
+    try:
+        master = sessionlist2dict(xml2sessionlist(os.path.join(input_directory, "study_description.xml")))
+    except Exception as e:
+        raise LXMLDecodeError(input_directory, e)
 
     subject_num = 0
     subject_dict = dict()
@@ -150,8 +164,8 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
         print(matlab_out.getvalue())
         print(matlab_err.getvalue())
 
-    for session_key, session_parent in xml['sessions'].items():
-        for session in session_parent: # multiple sessions may be indexed on the same number, therefore each number is its own list of sessions
+    for session_key, session_parent in master.items():
+        for session in session_parent:
             task_name = underscore_to_camelcase(str(session['Task Label']))
             if task_name not in bids_file.tasks:
                 bids_file.tasks[task_name] = BIDSTask()
@@ -159,14 +173,14 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
 
             for subject_key, subject in session['Subjects'].items():
 
-                if subject_key not in subject_dict.keys():
+                if subject['Lab ID'] not in subject_dict.keys():
                     subject_num += 1
                     subject_id = "%02d" % subject_num
 
                     if DISPLAY_VALS:
                         print("Adding Subject %s to Structure..." % subject_id, flush=True)
 
-                    subject_dict[subject_key] = subject_id
+                    subject_dict[subject['Lab ID']] = subject_id
                     bids_file.subjects[subject_id] = BIDSSubject()
 
                     for field in subject.keys():
@@ -175,14 +189,14 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
                             bids_file.field_definitions[field.lower().replace(" ", "_")] = participant_level_tags[
                                 field.lower().replace(" ", "_")]
 
-                    bids_file.subjects[subject_id].fields['legacy_labID'] = subject_key
+                    bids_file.subjects[subject_id].fields['legacy_labID'] = subject['Lab ID'] if subject['Lab ID'] else 'n/a'
                     bids_file.field_definitions['legacy_labID'] = participant_level_tags['legacy_labID']
 
-                subject_id = subject_dict[subject_key]
+                subject_id = subject_dict[subject['Lab ID']]
 
-                if session_key not in session_numbers:
+                if (session['Number'] not in session_numbers):
                     session_id = "%02d" % (len(bids_file.subjects[subject_id].sessions) + 1)
-                    session_numbers[session_key] = session_id
+                    session_numbers[session['Number']] = session_id
 
                     if DISPLAY_VALS:
                         print("Adding information from Session %s" % session_id, flush=True)
@@ -198,12 +212,12 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
                     bids_file.subjects[subject_id].sessions[session_id].field_definitions['ESS_dataRecordingUuid'] = \
                     scan_level_tags['ESS_dataRecordingUuid']
                     bids_file.subjects[subject_id].sessions[session_id].field_definitions['ESS_inSessionRecordingNum'] = scan_level_tags['ESS_inSessionRecordingNum']
-                    bids_file.subjects[subject_id].sessions[session_id].fields['ESS_subjectLabID'] = subject_key
+                    bids_file.subjects[subject_id].sessions[session_id].fields['ESS_subjectLabID'] = subject['Lab ID']
                     bids_file.subjects[subject_id].field_definitions['ESS_subjectLabID'] = session_level_tags['ESS_subjectLabID']
 
-                    # if session.get('Number') and session['Number'] != "n/a":
-                    bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionNum'] = session_key
-                    bids_file.subjects[subject_id].field_definitions['ESS_sessionNum'] = session_level_tags['ESS_sessionNum']
+                    if session.get('Number') and session['Number'] != "n/a":
+                        bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionNum'] = session['Number']
+                        bids_file.subjects[subject_id].field_definitions['ESS_sessionNum'] = session_level_tags['ESS_sessionNum']
 
                     # TODO: this will likely have to be scan specific
                     if session.get('Lab ID') and session['Lab ID'] != "n/a":
@@ -231,12 +245,16 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
                             bids_file.subjects[subject_id].field_definitions[field.lower().replace(" ", "_")] = \
                                 session_level_tags[field.lower().replace(" ", "_")]
                 else:
-                    session_id = session_numbers[session_key]
+                    session_id = session_numbers[session['Number']]
 
-                rec_parameter_sets = xml['rec_parameter_sets']
+
+                try:
+                    rec_parameter_sets = xml2recparamsetlist(os.path.join(input_directory, "study_description.xml"))
+                except Exception as e:
+                    raise LXMLDecodeError(input_directory, e)
 
                 for run_key, run in session['Data Recordings'].items():
-                    current_ses_dir = os.path.join(input_directory, "session", session_key)
+                    current_ses_dir = os.path.join(input_directory, "session", session['Number'])
 
                     run_count = len([i for i in bids_file.subjects[subject_id].sessions[session_id].scans.keys() if task_name in i]) + 1
                     current_label = "eeg/sub-%s_ses-%s_task-%s_run-%1d_eeg.set" % (subject_id, session_id, task_name, run_count)
@@ -310,8 +328,9 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
                         for i in range(0, len(rps_entry[0])):
                             bids_file.subjects[subject_id].sessions[session_id].electrodes[rps_entry[0][i]] = {'x': rps_entry[2][i], 'y': rps_entry[3][i], 'z': rps_entry[4][i]}
 
-                    for ps_label, ps in [ (psl, ps) for psl, ps in rec_parameter_sets.items() if psl == run['Recording Parameter Set Label']]:
-                        for modality, mode in ps.items():
+                    for parameter_set in [ps.todict() for ps in rec_parameter_sets if ps.todict()['Recording Parameter Set Label'] == run['Recording Parameter Set Label']]:
+                        for modality in parameter_set['Channel Types'].keys():
+                            mode = parameter_set['Channel Types'][modality]
                             modality = modality.upper()
                             if modality not in channel_types and modality != 'EKG':
                                 modality = 'MISC'
@@ -358,27 +377,32 @@ def _generate_bids_sessions(bids_file, xml, input_directory, eeg_path):
     matlab_engine.quit()
 
 
-def _generate_bids_tasks(bids_file, xml):
+def _generate_bids_tasks(bids_file, input_directory):
     """
     Internal function use to pick apart task references in 'study_description.xml'
 
     :param bids_file: BIDSProject, which fields are changed in place
-    :param xml: Extracted XML document for study_description
+    :param input_directory: Source filepath for a given ESS study
     :return:
     """
+    try:
+        rec_parameter_sets = xml2recparamsetlist(os.path.join(input_directory, "study_description.xml"))
+        bids_tasks = tasklist2dict(xml2tasklist(os.path.join(input_directory, "study_description.xml")))
+    except Exception as e:
+        raise LXMLDecodeError(input_directory, e)
 
-    for task_label, task in xml['tasks'].items():
-        new_task_name = underscore_to_camelcase(task_label)
+    for task in bids_tasks.keys():
+        new_task_name = underscore_to_camelcase(bids_tasks[task]['Task Label'])
         if new_task_name not in bids_file.tasks:
             bids_file.tasks[new_task_name] = BIDSTask()
 
-        bids_file.tasks[new_task_name].add_field('TaskDescription', task['Description'])
+        bids_file.tasks[new_task_name].add_field('TaskDescription', bids_tasks[task]['Description'])
 
         bids_file.field_replacements['tasks'][new_task_name] = list()
-        for rps_label in xml['rec_parameter_sets']:
+        for rec_parameter_set in rec_parameter_sets:
             bids_file.field_replacements['tasks'][new_task_name].append(
                 {'where': {
-                    'legacy_recordingParameterSet': rps_label
+                    'legacy_recordingParameterSet':rec_parameter_set.todict()['Recording Parameter Set Label']
                 }, 'PowerLineFrequency': None}
             )
 
