@@ -95,7 +95,7 @@ def import_project(path, stub=False) -> BIDSProject:
                 for sidecar in [file for file in os.listdir(os.path.join(path, sub_ses)) if
                                 re.match(r"%s_task-[a-zA-Z0-9]+_.*?\.json" % '_'.join(os.path.split(sub_ses)), file)]:
                     try:
-                        task_name = re.match(r"task-([a-zA-Z0-9]+)_", sidecar).group(1)
+                        task_name = re.search(r"task-([a-zA-Z0-9]+)_", sidecar).group(1)
                         bids_project.tasks[task_name].fields.update(
                             {os.path.split(sub_ses)[0] + task_specificity_token + os.path.split(sub_ses)[1] + task_specificity_token + k: v for (k, v) in util.read_json(os.path.join(path, sub_ses, sidecar)).items()})
                     except JSONDecodeError:

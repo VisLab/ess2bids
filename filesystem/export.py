@@ -16,10 +16,10 @@ from structure.project import *
 from structure.subject import *
 from structure.task import *
 
-bids_ignore = """field_replacements.json
-archived
-VALIDATOR_OUTPUT.txt
-REPORT.txt"""
+# bids_ignore = """field_replacements.json
+# archived
+# VALIDATOR_OUTPUT.txt
+# REPORT.txt"""
 
 
 # TODO: each sidecar is written with _eeg in the name. make this more agnostic? as well as coordsystem and electrodes
@@ -101,17 +101,18 @@ def export_project(bids_project: BIDSProject, output_path, changes=None, renamed
         changes.remove('%s/field_replacements.json' % output_path)
     util.write_json(bids_project.field_replacements, '%s/field_replacements.json' % (output_path), changes=changes)
 
-    local_ignore = bids_ignore
+    # local_ignore = bids_ignore
     for ignored_file in bids_project.ignored_files:
-        local_ignore += "\n" + os.path.basename(ignored_file)
+        # local_ignore += "\n" + os.path.basename(ignored_file)
         copyargs = (ignored_file, os.path.join(output_path, os.path.basename(ignored_file)))
-        if not stub and not util.is_changed(os.path.join(output_path, os.path.basename(ignored_file)), changes):
+        if not stub and util.is_changed(os.path.join(output_path, os.path.basename(ignored_file)), changes):
             if os.path.isdir(ignored_file):
-                shutil.copytree(*copyargs)
+                if not os.path.isdir(os.path.join(output_path, os.path.basename(ignored_file))):
+                    shutil.copytree(*copyargs)
             else:
                 shutil.copy(*copyargs)
 
-    util.write(bids_ignore, "%s/.bidsignore" % output_path, changes=changes)
+    # util.write(local_ignore, "%s/.bidsignore" % output_path, changes=changes)
 
     util.write_tsv({"sub-" + k: v for k, v in bids_project.subjects.items()}, "%s/participants.tsv" % output_path, primary_key="participant_id" ,changes=changes)
     util.write_json(bids_project.field_definitions, "%s/participants.json" % output_path, changes=changes)

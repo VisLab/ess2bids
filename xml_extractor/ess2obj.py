@@ -1,179 +1,176 @@
 from lxml import etree
-from xml_extractor.ClassDef import *
+
+def extract_description(xmlpath):
+    doc_root = etree.parse(xmlpath, etree.XMLParser(encoding='utf-8')).getroot()
+    description = dict()
+
+    description['head'] = _xml2head(doc_root)
+    description['sessions'] = _xml2sessions(doc_root.find('sessions').findall('session'))
+    description['tasks'] = _xml2tasks(doc_root.find('tasks').findall('task'))
+    description['rec_parameter_sets'] = _xml2recordingparametersets(doc_root.find('recordingParameterSets').findall('recordingParameterSet'))
+    description['event_codes'] = _xml2eventcodes(doc_root.find('eventCodes').findall('eventCode'))
+
+    _scrub_na(description)
+    return description
 
 
-# TODO: parse notes (notes is still Element obj)
-
-parser = etree.XMLParser(encoding='utf-8')
-
-
-def xml2sessionlist(xmlpath):  # opens xml at path and returns a list of session objects
-    # parse xml for sessions etree
-    etree_sessions = etree.parse(xmlpath, parser).getroot().find('sessions').findall('session')
-
-    # turn the Element object into a list of sessions
-    sessions = list()
-    for session in etree_sessions:
-        number = session.find('number').text
-        tasklabel = session.find('taskLabel').text
-        sessionlabid = session.find('labId').text
-
-        etreesubjects = session.findall('subject')  # get Element objects to parse
-
-        subjects = list()
-        for subject in etreesubjects:
-            subjectlabid = subject.find('labId').text
-            insessionnumber = subject.find('inSessionNumber').text
-            group = subject.find('group').text
-            gender = subject.find('gender').text
-            yob = subject.find('YOB').text
-            age = subject.find('age').text
-            hand = subject.find('hand').text
-            vision = subject.find('vision').text
-            hearing = subject.find('hearing').text
-            height = subject.find('height').text
-            weight = subject.find('weight').text
-            medication = subject.find('medication')
-            channellocations = subject.find('channelLocations').text
-
-            caffeine = medication.find('caffeine').text
-            alcohol = medication.find('alcohol').text
-            medication = Medication(caffeine, alcohol)
-
-            subjects.append(Subject(subjectlabid, insessionnumber, group, gender, yob, age, hand, vision, hearing,
-                                    height, weight, medication, channellocations))
-        # TODO: is notes needed? if so how to implement?
-        # notes = session.find('notes')
-        notes = ''
-
-        datarecordings = list()
-        for datarecord in session.find('dataRecordings').findall('dataRecording'):
-            filename = datarecord.find('filename').text
-            datarecordinguuid = datarecord.find('dataRecordingUuid').text
-            startdatetime = datarecord.find('startDateTime').text
-            recordingparametersetlabel = datarecord.find('recordingParameterSetLabel').text
-            eventinstancefile = datarecord.find('eventInstanceFile').text
-            originalfilenameandpath = datarecord.find('originalFileNameAndPath').text
-
-            datarecordings.append(DataRecording(filename, datarecordinguuid, startdatetime, recordingparametersetlabel,
-                                                eventinstancefile, originalfilenameandpath))
-
-        sessions.append(Session(number, tasklabel, sessionlabid, subjects, notes, datarecordings))
-    return sessions
-
-
-def xml2tasklist(xmlpath):
-    # parse xml for tasks etree
-    etree_tasks = etree.parse(xmlpath, parser).getroot().find('tasks').findall('task')
-
-    # make list
-    tasks = list()
-    for task in etree_tasks:
-        tasks.append(Task(task.find('taskLabel').text, task.find('tag').text, task.find('description').text))
-    return tasks
-
-
-def xml2eventcodelist(xmlpath):
-    # parse xml for eventcodes etree
-    etree_eventcodes = etree.parse(xmlpath, parser).getroot().find('eventCodes').findall('eventCode')
-
-    eventcodes = list()
-    for eventcode in etree_eventcodes:
-        code = eventcode.find('code').text
-        tasklabel = eventcode.find('taskLabel')
-        if tasklabel is not None:
-            tasklabel = tasklabel.text
-        else:
-            tasklabel = ''
-        try:
-            numinstances = int(eventcode.find('numberOfInstances').text)
-        except AttributeError:
-            numinstances = 1
-        hedtag = eventcode.find('condition').find('tag').text
-        label = eventcode.find('condition').find('label').text
-        description = eventcode.find('condition').find('description').text
-
-        eventcodes.append(EventCode(code, tasklabel, numinstances, hedtag, label, description))
-    return eventcodes
-
-
-def xml2recparamsetlist(xmlpath):
-    # parse xml for recparamsets etree
-    etree_recparamsets = etree.parse(xmlpath, parser).getroot().find('recordingParameterSets').findall('recordingParameterSet')
-
-    recparamsets = list()
-    for recparamset in etree_recparamsets:
-        recordingparametersetlabel = recparamset.find('recordingParameterSetLabel').text
-        etree_channeltypes = recparamset.find('channelType').findall('modality')
-
-        channeltypes = list()
-        for modality in etree_channeltypes:
-            mtype = modality.find('type').text
-            samplingrate = modality.find('samplingRate').text
-            name = modality.find('name').text
-            description = modality.find('description').text
-            startchannel = modality.find('startChannel').text
-            endchannel = modality.find('endChannel').text
-            subjectinsessionnumber = modality.find('subjectInSessionNumber').text
-            referencelocation = modality.find('referenceLocation').text
-            referencelabel = modality.find('referenceLabel').text
-            channellocationtype = modality.find('channelLocationType').text
-
-            channellabels = list(map(str.strip, modality.find('channelLabel').text.split(',')))
-            nonscalpchannellabels = list(map(str.strip, modality.find('nonScalpChannelLabel').text.split(',')))
-
-            channeltypes.append(
-                Modality(mtype, samplingrate, name, description, startchannel, endchannel, subjectinsessionnumber,
-                         referencelocation, referencelabel, channellocationtype, channellabels, nonscalpchannellabels))
-
-        recparamsets.append(RecordingParameterSet(recordingparametersetlabel, channeltypes))
-    return recparamsets
-
-
-def xml2head(xmlpath):
-    """
-    extract: title, description(notshort), project.funding.org, uuid, rooturi, summary.licence(concatenate the 3 things)
-    """
-    headtree = etree.parse(xmlpath, parser).getroot()
+def _xml2head(head):
+    header_dict = dict()
 
     # extract each attribute
-    title = headtree.find('title').text
-    description = headtree.find('description').text
-    fundingorganization = headtree.find('project').find('funding').find('organization').text
-    uuid = headtree.find('uuid').text
-    rooturi = headtree.find('rootURI').text
+    header_dict['Title'] = head.findtext('title')
+    header_dict['Description'] = head.findtext('description')
+    header_dict['Funding Organization'] = head.find('project').find('funding').findtext('organization')
+    header_dict['UUID'] = head.findtext('uuid')
+    header_dict['Root URI'] = head.findtext('rootURI')
 
     # following code accounts for possible missing tags in license
-    ltype = headtree.find('summary').find('license').find('type')
-    text = headtree.find('summary').find('license').find('text')
-    link = headtree.find('summary').find('license').find('link')
-    none_check = lambda x: '' if x is None else x
-    studylicense = f'{none_check(ltype.text)} {none_check(text.text)} {none_check(link.text)}'.strip()
-    return Head(title, description, fundingorganization, uuid, rooturi, studylicense)
+    license_tag = head.find('summary').find('license')
+    license_type = license_tag.findtext('type')
+    text = license_tag.findtext('text')
+    link = license_tag.findtext('link')
+    header_dict['Study License'] = f"{license_type or ''} {text or ''} {link or ''}".strip()
+
+    return header_dict
+
+def _xml2sessions(sessions):
+    # turn the Element object into a dict of sessions
+    sessions_dict = dict()
+    for session in sessions:
+        key = session.findtext('number')
+        if key not in sessions_dict:
+            sessions_dict[key] = list()
+        current_session = dict()
+
+        current_session['Task Label'] = session.findtext('taskLabel')
+        current_session['Lab ID'] = session.findtext('labId')
+        current_session['Subjects'] = _subjects_from_session_xml(session.findall('subject'))
+
+        current_session['Notes'] = ''
+        current_session['Data Recordings'] = _data_recordings_from_session_xml(session.find('dataRecordings').findall('dataRecording'))
+
+        sessions_dict[key].append(current_session)
+
+    return sessions_dict
 
 
-def clean_obj(obj):
-    for attr, value in obj.__dict__.items():
-        if value is None:
-            return
-        elif isinstance(value, str):
-            # do all the string cleanups
-            if value == 'NA': obj.__dict__[attr] = 'n/a'
-        elif isinstance(value, list):
-            clean_list(value)  # recursive call
-        else:  # obj
-            clean_obj(value)
+def _subjects_from_session_xml(subjects):
+    subjects_dict = dict()
+    for subject in subjects:
+        key = subject.findtext('labId')
+        current_subject = subjects_dict[key] = dict()
+
+        current_subject['In Session Number'] = subject.findtext('inSessionNumber')
+        current_subject['Group'] = subject.findtext('group')
+        current_subject['Gender'] = subject.findtext('gender')
+        current_subject['Year of Birth'] = subject.findtext('YOB')
+        current_subject['Age'] = subject.findtext('age')
+        current_subject['Hand'] = subject.findtext('hand')
+        current_subject['Vision'] = subject.findtext('vision')
+        current_subject['Hearing'] = subject.findtext('hearing')
+        current_subject['Height'] = subject.findtext('height')
+        current_subject['Weight'] = subject.findtext('weight')
+        current_subject['Channel Locations'] = subject.findtext('channelLocations')
+
+        medication = subject.find('medication')
+        caffeine = medication.findtext('caffeine')
+        alcohol = medication.findtext('alcohol')
+
+        current_subject['Medication'] = {'Caffeine': caffeine, 'Alcohol': alcohol}
+
+    return subjects_dict
 
 
-def clean_list(obj_list):
-    for obj in obj_list:
-        clean_obj(obj)
-    return obj_list
+def _data_recordings_from_session_xml(data_recordings):
+    data_recordings_dict = dict()
+    for data_recording in data_recordings:
+        key = data_recording.findtext('dataRecordingUuid')
+        current_data_recording = data_recordings_dict[key] = dict()
+
+        current_data_recording['Filename'] = data_recording.findtext('filename')
+        current_data_recording['Data Recording UUID'] = data_recording.findtext('dataRecordingUuid')
+        current_data_recording['Start Date Time'] = data_recording.findtext('startDateTime')
+        current_data_recording['Recording Parameter Set Label'] = data_recording.findtext('recordingParameterSetLabel')
+        current_data_recording['Event Instance File'] = data_recording.findtext('eventInstanceFile')
+        current_data_recording['Original Filename and Path'] = data_recording.findtext('originalFileNameAndPath')
+
+    return data_recordings_dict
 
 
-if __name__ == '__main__':
-    path = 'Z:/NCTU_LK/level_1/study_description.xml'
-    head = xml2head(path)
-    event = xml2eventcodelist(path)
-    print(head.title)
-    print(event[0].code)
+def _xml2tasks(tasks):
+    tasks_dict = dict()
+    for task in tasks:
+        key = task.findtext('taskLabel')
+        current_task = tasks_dict[key] = dict()
+
+        current_task['Description'] = task.findtext('description')
+        current_task['Tag'] = task.findtext('tag')
+
+    return tasks_dict
+
+def _xml2recordingparametersets(rec_parameter_sets):
+    rps_dict = dict()
+    for rps in rec_parameter_sets:
+        key = rps.findtext('recordingParameterSetLabel')
+        current_rps = rps_dict[key] = dict()
+
+        modalities = rps.find('channelType').findall('modality')
+
+        for modality in modalities:
+            key = modality.findtext('type')
+            current_mod = current_rps[key] = dict()
+
+            current_mod['Sampling Rate'] = modality.findtext('samplingRate')
+            current_mod['Name'] = modality.findtext('name')
+            current_mod['Description'] = modality.findtext('description')
+            current_mod['Start Channel'] = modality.findtext('startChannel')
+            current_mod['End Channel'] = modality.findtext('endChannel')
+            current_mod['Subject In-Session Number'] = modality.findtext('subjectInSessionNumber')
+            current_mod['Reference Location'] = modality.findtext('referenceLocation')
+            current_mod['Reference Label'] = modality.findtext('referenceLabel')
+            current_mod['Channel Location Type'] = modality.findtext('channelLocationType')
+
+            current_mod['Channel Labels'] = list(map(str.strip, modality.findtext('channelLabel').split(',')))
+            current_mod['Non-Scalp Channel Labels'] = list(map(str.strip, modality.findtext('nonScalpChannelLabel').split(',')))
+
+    return rps_dict
+
+
+def _xml2eventcodes(event_codes):
+    event_codes_list = list() # iterated as list instead of dict since we would have to index by both task label and event code, no purpose in doing so
+    for event_code in event_codes:
+        current_event_code = dict()
+        event_codes_list.append(current_event_code)
+
+        current_event_code['Code'] = event_code.findtext('code')
+        current_event_code['Task Label'] = event_code.findtext('taskLabel') or ''
+
+        try:
+            current_event_code['No. instances'] = int(event_code.findtext('numberOfInstances'))
+        except AttributeError:
+            current_event_code['No. instances'] = 0
+
+        condition = event_code.find('condition')
+        current_event_code['HED Tag'] = condition.findtext('tag')
+        current_event_code['Label'] = condition.findtext('label')
+        current_event_code['Description'] = condition.findtext('description')
+
+    return event_codes_list
+
+def _scrub_na(d):
+    incorrect_NAs = ("NA", 'NaN', '', None)
+
+    if isinstance(d, dict):
+        for key, value in d.items():
+            try:
+                iter(value)
+                if not isinstance(value, str):
+                    _scrub_na(value)
+                else:
+                    d[key] = value if value not in incorrect_NAs else 'n/a'
+            except TypeError:
+                # isn't str or dictionary, should be idempotent
+                pass
+    elif isinstance(d, list) or isinstance(d, set) or isinstance(d, tuple):
+        for item in d:
+            _scrub_na(item)
