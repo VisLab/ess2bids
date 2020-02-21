@@ -1,4 +1,9 @@
 {
-  "EEGLAB installation path": null,
-  "BIDSVersion": "1.2.1"
+  "eeglab_path": null,
+  "BIDSVersion": "1.2.1",
+  "bids-validator-config": {
+    "ignore": [],
+    "warn": ["INVALID_TSV_UNITS"],
+    "error": []
+  }
 }
