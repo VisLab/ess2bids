@@ -46,8 +46,6 @@ def _xml2sessions(sessions):
         current_session['Lab ID'] = session.findtext('labId')
         current_session['Subjects'] = _subjects_from_session_xml(session.findall('subject'))
 
-        # TODO: is notes needed?
-        # notes = session.find('notes')
         current_session['Notes'] = ''
         current_session['Data Recordings'] = _data_recordings_from_session_xml(session.find('dataRecordings').findall('dataRecording'))
 
@@ -150,7 +148,7 @@ def _xml2eventcodes(event_codes):
         try:
             current_event_code['No. instances'] = int(event_code.findtext('numberOfInstances'))
         except AttributeError:
-            current_event_code['No. instances'] = 1 # TODO: shouldn't this be 0?
+            current_event_code['No. instances'] = 0
 
         condition = event_code.find('condition')
         current_event_code['HED Tag'] = condition.findtext('tag')
