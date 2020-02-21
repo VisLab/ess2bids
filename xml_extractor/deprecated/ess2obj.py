@@ -38,8 +38,6 @@ def xml2sessionlist(xmlpath):  # opens xml at path and returns a list of session
 
             subjects.append(Subject(subjectlabid, insessionnumber, group, gender, yob, age, hand, vision, hearing,
                                     height, weight, medication, channellocations))
-        # TODO: is notes needed? if so how to implement?
-        # notes = session.find('notes')
         notes = ''
 
         datarecordings = list()

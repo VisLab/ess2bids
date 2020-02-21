@@ -185,7 +185,6 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                     bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionNum'] = session_key
                     bids_file.subjects[subject_id].field_definitions['ESS_sessionNum'] = session_level_tags['ESS_sessionNum']
 
-                    # TODO: this will likely have to be scan specific
                     if session.get('Lab ID') and session['Lab ID'] != "n/a":
                         bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionID'] = session['Lab ID']
                         bids_file.subjects[subject_id].field_definitions['ESS_sessionID'] = session_level_tags[
@@ -303,7 +302,7 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                                                                      subject_label=subject_id,
                                                                      session_label=session_id,
                                                                      scan_name=current_label)
-                                bids_file.tasks[task_name].add_field("EEGPlacementScheme", mode['Channel Location Type'] or "n/a", # TODO: are these legal?
+                                bids_file.tasks[task_name].add_field("EEGPlacementScheme", mode['Channel Location Type'] or "n/a",
                                                                      subject_label=subject_id, session_label=session_id,
                                                                      scan_name=current_label)
                                 bids_file.tasks[task_name].add_field("EEGReference", mode['Reference Label'] or "n/a",

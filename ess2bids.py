@@ -15,31 +15,53 @@ Positional Arguments:
 import argparse
 
 from filesystem.export import export_project
+from filesystem import util
 from ess.generator import *
 from ess.deprecated.generator import generate_bids_project as old_generate_bids_project
 from ess.replacer import replacer_delete, replacer_make
 from utilities.matlab_instance import *
 import io
 import matlab.engine
+import copy
 import sys
 import os
 import json
 
+default_bids_validator_config = {
+    "ignore": (),
+    "warn": (),
+    "error": (),
+    "ignoredFiles": ["/field_replacements.json", "/archived/**", "/VALIDATOR_OUTPUT.txt", "/REPORT.txt"]
+}
 
 def load_config():
     try:
         config_json = open('config.json')
         config = json.load(config_json)
         config_json.close()
-        required = ['EEGLAB installation path', 'BIDSVersion']
-        if not all(k in config for k in required):
+        required = ['eeglab_path', 'BIDSVersion']
+        if not all(config.get(k) for k in required):
             print("Missing fields in 'config.json':")
-            print([k for k in required if k not in config])
+            print([k for k in required if not config.get(k)])
             sys.exit(1)
+        if not config.get('bids-validator-config'):
+            config['bids-validator-config'] = default_bids_validator_config
+        else:
+            config['bids-validator-config'] = {k: (config['bids-validator-config'].get(k) or v) for k, v in default_bids_validator_config.items()}
     except EnvironmentError as e:
         print("Unable to open 'config.json'")
         raise e
     return config
+
+
+def write_validator_config(bvc, ignored_files, output_path, config_name=".bids-validator-config.json"):
+    output_config = copy.deepcopy(bvc)
+    for file in ignored_files:
+        ignore_filename = "/" + os.path.basename(file)
+        if os.path.isdir(file):
+            ignore_filename += "/**"
+        output_config['ignoredFiles'].append(ignore_filename)
+    util.write_json(output_config, os.path.join(output_path, config_name))
 
 
 def main():
@@ -62,7 +84,7 @@ def main():
         studies = (args.input,)
 
     try:
-        create_matlab_instance(config['EEGLAB installation path'])
+        create_matlab_instance(config['eeglab_path'])
     except matlab.engine.MatlabExecutionError:
         print("Failed to call 'eeglab()'. Check 'config.json' to make sure your EEGLAB installation path is correct.")
         sys.exit(1)
@@ -103,6 +125,7 @@ def main():
             else:
                 output = args.output
             export_project(bids_file, output, stub=args.stub, verbose=args.verbose, additional_report=report)
+            write_validator_config(config['bids-validator-config'], bids_file.ignored_files, output)
         except OSError as e:
             print(e)
             sys.exit(1)
