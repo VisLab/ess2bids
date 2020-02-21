@@ -40,7 +40,7 @@ def main():
         sys.exit(1)
 
     if not args.skip_validation and _bids_validator_installed():
-        bids_validator_process = subprocess.run("bids-validator --no-config %s" % args.bids_path, shell=True, capture_output=True)
+        bids_validator_process = subprocess.run("bids-validator %s" % args.bids_path, shell=True, capture_output=True)
 
         f = open(os.path.join(args.bids_path, "VALIDATOR_OUTPUT.txt"), "w", encoding='utf-8')
         f.write(bids_validator_process.stdout.decode("utf-8"))

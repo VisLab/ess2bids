@@ -24,7 +24,7 @@ Created by Jonathan Balraj and Joe Lambeth.
 Once the above dependencies are installed, run the converter using the following steps.
 
 1. Clone the repository on your local machine.
-2. Provide the path for your EEGLAB installation in `config.json` in the provided *null* value.
+2. Provide the path for your EEGLAB installation in `config.json` in the provided *null* value for `eeglab_path`.
 3. Invoke `ess2bids.py` with the command `python ess2bids.py <input> <output>`  to create the initial pass over the conversion.
 4. Fill in any *null* values in `field_replacements.json` located in the root of each BIDS study. More adjustments may be made at this point.
 5. Invoke `finalize.py <bids_path>` to fix the adjustments specified in `field_replacements.json`.
