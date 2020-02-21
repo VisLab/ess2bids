@@ -8,8 +8,6 @@ to be changed in order for the output BIDS study to be considered BIDS compliant
 __all__ = ["generate_bids_project", "generate_report", "LXMLDecodeError"]
 
 import datetime
-
-import matlab.engine
 import io
 import re
 import os.path
@@ -21,17 +19,17 @@ from structure.subject import BIDSSession, BIDSScan, BIDSSubject
 from xml_extractor.deprecated.ess2obj import *
 # from xml_extractor.ess2obj import extract_description
 from xml_extractor.deprecated.obj2json import *
+from utilities.matlab_instance import get_matlab_instance
 
 DISPLAY_VALS = None
 DISPLAY_MATLAB_OUTPUT = None
 
 
-def generate_bids_project(input_directory, eeg_path, verbose=False) -> BIDSProject:
+def generate_bids_project(input_directory, verbose=False) -> BIDSProject:
     """
     Converts an ESS structure into a BIDSProject
 
     :param input_directory: Source filepath for a given ESS study
-    :param eeg_path: Filepath for the installation of EEGLAB
     :param verbose: If set to True, additional logging is provided to standard output
     :return: BIDSProject object mapped from ESS file structure
     """
@@ -67,7 +65,7 @@ def generate_bids_project(input_directory, eeg_path, verbose=False) -> BIDSProje
     bids_file.changes = "1.0.0 - %s\n - Initial Release" % datetime.date.today()
 
     print("Reading project %s..." % input_directory)
-    _generate_bids_sessions(bids_file, input_directory, eeg_path)
+    _generate_bids_sessions(bids_file, input_directory)
     _generate_bids_tasks(bids_file, input_directory)
 
     try:
@@ -124,13 +122,12 @@ def generate_report(bids_file: BIDSProject) -> str:
     return report
 
 
-def _generate_bids_sessions(bids_file, input_directory, eeg_path):
+def _generate_bids_sessions(bids_file, input_directory):
     """
     Internal function used to pick apart each session of a given ESS study, and map it to BIDS
 
     :param bids_file: BIDSProject, which fields are changed in place
     :param input_directory: Source filepath for a given ESS study
-    :param eeg_path: Filepath for the installation of EEGLAB
     :return:
     """
     try:
@@ -145,24 +142,6 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
 
     matlab_out = io.StringIO()
     matlab_err = io.StringIO()
-
-    print('Loading Matlab engine...')
-
-    matlab_engine = matlab.engine.start_matlab("-nosplash")
-
-    try:
-        matlab_engine.addpath(eeg_path)
-    except Exception as e:
-        print("Error importing EEGLAB. Check your EEGLAB installation path in 'config.json'")
-        raise e
-    matlab_engine.addpath(os.path.join(os.path.dirname(os.path.abspath(__file__))), 'ess')
-
-    print('Loading EEGLAB...')
-
-    matlab_engine.eeglab(stdout=matlab_out, stderr=matlab_err)
-    if DISPLAY_MATLAB_OUTPUT:
-        print(matlab_out.getvalue())
-        print(matlab_err.getvalue())
 
     for session_key, session_parent in master.items():
         for session in session_parent:
@@ -295,7 +274,7 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
                         if run['Recording Parameter Set Label'] not in RPS_electrodes.keys():
                             print("Extracting electrode set from %s..." % run['Recording Parameter Set Label'])
 
-                            rps_entry = matlab_engine.ExtractChannels(run['Filename'], current_ses_dir, nargout=5,
+                            rps_entry = get_matlab_instance().ExtractChannels(run['Filename'], current_ses_dir, nargout=5,
                                                                       stdout=matlab_out, stderr=matlab_err)
                             if DISPLAY_MATLAB_OUTPUT:
                                 print(matlab_out.getvalue())
@@ -373,8 +352,6 @@ def _generate_bids_sessions(bids_file, input_directory, eeg_path):
                                 channels_dict[channel]['units'] = u'µV'
                                 channels_dict[channel]['sampling_frequency'] = mode['Sampling Rate']
                                 # stubbed, since all channels have the same reference, so this only goes in the sidecar...channels_dict[channel]['reference'] = mode['Reference Label']
-
-    matlab_engine.quit()
 
 
 def _generate_bids_tasks(bids_file, input_directory):
