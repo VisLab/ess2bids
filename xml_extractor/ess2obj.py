@@ -1,5 +1,6 @@
 from lxml import etree
 
+
 def extract_description(xmlpath):
     doc_root = etree.parse(xmlpath, etree.XMLParser(encoding='utf-8')).getroot()
     description = dict()
@@ -7,7 +8,8 @@ def extract_description(xmlpath):
     description['head'] = _xml2head(doc_root)
     description['sessions'] = _xml2sessions(doc_root.find('sessions').findall('session'))
     description['tasks'] = _xml2tasks(doc_root.find('tasks').findall('task'))
-    description['rec_parameter_sets'] = _xml2recordingparametersets(doc_root.find('recordingParameterSets').findall('recordingParameterSet'))
+    description['rec_parameter_sets'] = _xml2recordingparametersets(
+        doc_root.find('recordingParameterSets').findall('recordingParameterSet'))
     description['event_codes'] = _xml2eventcodes(doc_root.find('eventCodes').findall('eventCode'))
 
     _scrub_na(description)
@@ -33,6 +35,7 @@ def _xml2head(head):
 
     return header_dict
 
+
 def _xml2sessions(sessions):
     # turn the Element object into a dict of sessions
     sessions_dict = dict()
@@ -47,7 +50,8 @@ def _xml2sessions(sessions):
         current_session['Subjects'] = _subjects_from_session_xml(session.findall('subject'))
 
         current_session['Notes'] = ''
-        current_session['Data Recordings'] = _data_recordings_from_session_xml(session.find('dataRecordings').findall('dataRecording'))
+        current_session['Data Recordings'] = \
+            _data_recordings_from_session_xml(session.find('dataRecordings').findall('dataRecording'))
 
         sessions_dict[key].append(current_session)
 
@@ -108,6 +112,7 @@ def _xml2tasks(tasks):
 
     return tasks_dict
 
+
 def _xml2recordingparametersets(rec_parameter_sets):
     rps_dict = dict()
     for rps in rec_parameter_sets:
@@ -131,13 +136,14 @@ def _xml2recordingparametersets(rec_parameter_sets):
             current_mod['Channel Location Type'] = modality.findtext('channelLocationType')
 
             current_mod['Channel Labels'] = list(map(str.strip, modality.findtext('channelLabel').split(',')))
-            current_mod['Non-Scalp Channel Labels'] = list(map(str.strip, modality.findtext('nonScalpChannelLabel').split(',')))
+            current_mod['Non-Scalp Channel Labels'] = \
+                list(map(str.strip, modality.findtext('nonScalpChannelLabel').split(',')))
 
     return rps_dict
 
 
 def _xml2eventcodes(event_codes):
-    event_codes_list = list() # iterated as list instead of dict since we would have to index by both task label and event code, no purpose in doing so
+    event_codes_list = list()  # iterated as list instead of dict to avoid indexing by both task label and event code
     for event_code in event_codes:
         current_event_code = dict()
         event_codes_list.append(current_event_code)
@@ -157,8 +163,9 @@ def _xml2eventcodes(event_codes):
 
     return event_codes_list
 
+
 def _scrub_na(d):
-    incorrect_NAs = ("NA", 'NaN', '', None)
+    incorrect_nas = ("NA", 'NaN', '', None)
 
     if isinstance(d, dict):
         for key, value in d.items():
@@ -167,10 +174,9 @@ def _scrub_na(d):
                 if not isinstance(value, str):
                     _scrub_na(value)
                 else:
-                    d[key] = value if value not in incorrect_NAs else 'n/a'
+                    d[key] = value if value not in incorrect_nas else 'n/a'
             except TypeError:
-                # isn't str or dictionary, should be idempotent
-                pass
+                pass  # isn't str or dictionary, should be idempotent
     elif isinstance(d, list) or isinstance(d, set) or isinstance(d, tuple):
         for item in d:
             _scrub_na(item)

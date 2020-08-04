@@ -1,6 +1,6 @@
 {
-  "eeglab_path": null,
-  "BIDSVersion": "1.2.1",
+  "eeglab_path": "D:/Research/BIDS/bidsCuration/eeglab2019_1",
+  "BIDSVersion": "1.4.0",
   "bids-validator-config": {
     "ignore": [],
     "warn": ["INVALID_TSV_UNITS"],

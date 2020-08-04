@@ -20,7 +20,6 @@ from ess.generator import *
 from ess.deprecated.generator import generate_bids_project as old_generate_bids_project
 from ess.replacer import replacer_delete, replacer_make
 from utilities.matlab_instance import *
-import io
 import matlab.engine
 import copy
 import sys
@@ -33,6 +32,7 @@ default_bids_validator_config = {
     "error": (),
     "ignoredFiles": ["/field_replacements.json", "/archived/**", "/VALIDATOR_OUTPUT.txt", "/REPORT.txt"]
 }
+
 
 def load_config():
     try:
@@ -47,7 +47,8 @@ def load_config():
         if not config.get('bids-validator-config'):
             config['bids-validator-config'] = default_bids_validator_config
         else:
-            config['bids-validator-config'] = {k: (config['bids-validator-config'].get(k) or v) for k, v in default_bids_validator_config.items()}
+            config['bids-validator-config'] = {k: (config['bids-validator-config'].get(k) or v)
+                                               for k, v in default_bids_validator_config.items()}
     except EnvironmentError as e:
         print("Unable to open 'config.json'")
         raise e
@@ -71,10 +72,15 @@ def main():
 
     parser.add_argument('input', type=str, help="input directory for top-level ESS study")
     parser.add_argument('output', type=str, help="output path for BIDS study")
-    parser.add_argument('-s', '--stub', action='store_true', help="if set, doesn't copy over large files, and only generates metadata")
-    parser.add_argument('-v', '--verbose', action='store_true', help="if set, generates additional logs for metadata extraction and generation")
-    parser.add_argument('-l', '--legacy', action='store_true', help="if set, uses deprecated ESS converter")
-    parser.add_argument('-b', '--batch', action='store_true', help="if set, converts all studies within directory set by 'input', and outputs them as subdirectories in 'output'")
+    parser.add_argument('-s', '--stub', action='store_true',
+                        help="if set, doesn't copy over large files, and only generates metadata")
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help="if set, generates additional logs for metadata extraction and generation")
+    parser.add_argument('-l', '--legacy', action='store_true',
+                        help="if set, uses deprecated ESS converter")
+    parser.add_argument('-b', '--batch', action='store_true',
+                        help="if set, converts all studies within directory set by 'input', \
+                        and outputs them as subdirectories in 'output'")
 
     args = parser.parse_args()
 

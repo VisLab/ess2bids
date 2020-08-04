@@ -18,10 +18,11 @@ class BIDSSubject:
         fields: entries in 'participants.tsv' for the given subject
         field_definitions: entries in '_sessions.json' for every session under the subject
     """
+
     def __init__(self):
         self.sessions: Dict[str, BIDSSession] = dict()
-        self.fields = dict() # entries in 'participants.tsv'
-        self.field_definitions = dict() # entries in '_sessions.json'
+        self.fields = dict()  # entries in 'participants.tsv'
+        self.field_definitions = dict()  # entries in '_sessions.json'
 
 
 class BIDSSession:
@@ -35,6 +36,7 @@ class BIDSSession:
         electrodes: entries in '_electrodes.tsv' for a given session
         coordsystem: entries in '_coordsystem.json' for a given session
     """
+
     def __init__(self):
         self.scans: Dict[str, BIDSScan] = dict()
         self.fields = dict()
@@ -55,6 +57,7 @@ class BIDSScan:
         events: entries in '_events.tsv'
         channels: entries in '_channels.tsv'
     """
+
     def __init__(self, path, task):
         self.task = task
         self.path = path
