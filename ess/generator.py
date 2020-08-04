@@ -68,7 +68,7 @@ def generate_bids_project(input_directory, verbose=False) -> BIDSProject:
             pass
         elif event_code['Task Label'] and bids_file.tasks[underscore_to_camelcase(event_code['Task Label'])]:
             bids_file.tasks[underscore_to_camelcase(event_code['Task Label'])].event_codes[event_code['Code']] = \
-            event_code['HED Tag']
+                event_code['HED Tag']
         else:
             bids_file.event_codes[event_code['Code']] = event_code['HED Tag']
 
@@ -87,23 +87,10 @@ def generate_report(bids_file: BIDSProject) -> str:
     :param bids_file:
     :return: A large string containing part of the report from the conversion.
     """
-    warnings_list = []
+
     report = disclaimer
-
-    for subject_name, subject in bids_file.subjects.items():
-        for session_name, session in subject.sessions.items():
-            if session.electrodes and not session.coordsystem:
-                warnings_list.append(
-                    "Warning: session %s specifies electrodes, but no coordinate system" % session_name)
-            for filename, scan in session.scans.items():
-                if list(session.electrodes.keys()) != list(
-                        filter(lambda x: scan.channels[x]['type'] == 'EEG', scan.channels.keys())):
-                    warnings_list.append(
-                        "Warning: session %s has mismatched electrodes with %s" % (session_name, filename))
-
-    if len(bids_file.event_codes) > 1 and len(bids_file.tasks) > 1:
-        warnings_list.append("Warning: some eventCodes fail to specify a taskLabel")
-
+    warnings_list = bids_file.generate_warnings()
+ 
     if len(warnings_list) > 0:
         report += "\n\n === WARNINGS === \n\n"
         for warning in warnings_list:
@@ -124,14 +111,14 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
 
     subject_num = 0
     subject_dict = dict()
-    RPS_electrodes = dict()
+    rps_electrodes = dict()
     session_numbers = dict()
 
     matlab_out = io.StringIO()
     matlab_err = io.StringIO()
 
     for session_key, session_parent in xml['sessions'].items():
-        for session in session_parent: # multiple sessions may be indexed on the same number, therefore each number is its own list of sessions
+        for session in session_parent:  # multiple sessions may be indexed on the same number, so own list of sessions
             task_name = underscore_to_camelcase(str(session['Task Label']))
             if task_name not in bids_file.tasks:
                 bids_file.tasks[task_name] = BIDSTask()
@@ -176,14 +163,17 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                     bids_file.subjects[subject_id].sessions[session_id] = BIDSSession()
                     bids_file.subjects[subject_id].sessions[session_id].fields['acq_time'] = lowest_time
                     bids_file.subjects[subject_id].sessions[session_id].field_definitions['ESS_dataRecordingUuid'] = \
-                    scan_level_tags['ESS_dataRecordingUuid']
-                    bids_file.subjects[subject_id].sessions[session_id].field_definitions['ESS_inSessionRecordingNum'] = scan_level_tags['ESS_inSessionRecordingNum']
+                        scan_level_tags['ESS_dataRecordingUuid']
+                    bids_file.subjects[subject_id].sessions[session_id].field_definitions['ESS_inSessionRecordingNum'] \
+                        = scan_level_tags['ESS_inSessionRecordingNum']
                     bids_file.subjects[subject_id].sessions[session_id].fields['ESS_subjectLabID'] = subject_key
-                    bids_file.subjects[subject_id].field_definitions['ESS_subjectLabID'] = session_level_tags['ESS_subjectLabID']
+                    bids_file.subjects[subject_id].field_definitions['ESS_subjectLabID'] = \
+                        session_level_tags['ESS_subjectLabID']
 
                     # if session.get('Number') and session['Number'] != "n/a":
                     bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionNum'] = session_key
-                    bids_file.subjects[subject_id].field_definitions['ESS_sessionNum'] = session_level_tags['ESS_sessionNum']
+                    bids_file.subjects[subject_id].field_definitions['ESS_sessionNum'] = \
+                        session_level_tags['ESS_sessionNum']
 
                     if session.get('Lab ID') and session['Lab ID'] != "n/a":
                         bids_file.subjects[subject_id].sessions[session_id].fields['ESS_sessionID'] = session['Lab ID']
@@ -191,22 +181,28 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                             'ESS_sessionID']
 
                     if session.get('In Session Number') and session['In Session Number'] != 'n/a':
-                        bids_file.subjects[subject_id].sessions[session_id].fields['ESS_inSessionRecordingNum'] = session['In Session Number']
-                        bids_file.subjects[subject_id].field_definitions['ESS_inSessionRecordingNum'] = session_level_tags['ESS_inSessionRecordingNum']
+                        bids_file.subjects[subject_id].sessions[session_id].fields['ESS_inSessionRecordingNum'] = \
+                            session['In Session Number']
+                        bids_file.subjects[subject_id].field_definitions['ESS_inSessionRecordingNum'] = \
+                            session_level_tags['ESS_inSessionRecordingNum']
 
                     if subject.get('Medication'):
                         if subject['Medication'].get('Caffeine') and subject['Medication'].get('Caffeine') != 'n/a':
-                            bids_file.subjects[subject_id].sessions[session_id].fields['caffeine'] = subject['Medication']['Caffeine']
-                            bids_file.subjects[subject_id].field_definitions['caffeine'] = session_level_tags['caffeine']
+                            bids_file.subjects[subject_id].sessions[session_id].fields['caffeine'] = \
+                                subject['Medication']['Caffeine']
+                            bids_file.subjects[subject_id].field_definitions['caffeine'] = \
+                                session_level_tags['caffeine']
 
                         if subject['Medication'].get('Alcohol') and subject['Medication']['Alcohol'] != 'n/a':
-                            bids_file.subjects[subject_id].sessions[session_id].fields['alcohol'] = subject['Medication']['Alcohol']
+                            bids_file.subjects[subject_id].sessions[session_id].fields['alcohol'] = \
+                                subject['Medication']['Alcohol']
                             bids_file.subjects[subject_id].field_definitions['alcohol'] = session_level_tags['alcohol']
 
                     for field in subject.keys():
-                        if session_level_tags.get(field) and subject[field] and subject[field] != "n/a" and subject[field] != "":
-                            bids_file.subjects[subject_id].sessions[session_id].fields[field.lower().replace(" ", "_")] = \
-                                subject[field]
+                        if session_level_tags.get(field) and subject[field] and subject[field] != \
+                                "n/a" and subject[field] != "":
+                            bids_file.subjects[subject_id].sessions[session_id].fields[
+                                field.lower().replace(" ", "_")] = subject[field]
                             bids_file.subjects[subject_id].field_definitions[field.lower().replace(" ", "_")] = \
                                 session_level_tags[field.lower().replace(" ", "_")]
                 else:
@@ -217,13 +213,19 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                 for run_key, run in session['Data Recordings'].items():
                     current_ses_dir = os.path.join(input_directory, "session", session_key)
 
-                    run_count = len([i for i in bids_file.subjects[subject_id].sessions[session_id].scans.keys() if task_name in i]) + 1
-                    current_label = "eeg/sub-%s_ses-%s_task-%s_run-%1d_eeg.set" % (subject_id, session_id, task_name, run_count)
+                    run_count = len([i for i in bids_file.subjects[subject_id].sessions[session_id].scans.keys()
+                                     if task_name in i]) + 1
+                    current_label = "eeg/sub-%s_ses-%s_task-%s_run-%1d_eeg.set" % \
+                                    (subject_id, session_id, task_name, run_count)
 
-                    bids_file.subjects[subject_id].sessions[session_id].scans[current_label] = BIDSScan(os.path.join(current_ses_dir, run['Filename']), task_name)
+                    bids_file.subjects[subject_id].sessions[session_id].scans[current_label] = \
+                        BIDSScan(os.path.join(current_ses_dir, run['Filename']), task_name)
                     bids_file.subjects[subject_id].sessions[session_id].scans[current_label].run = run_count
-                    bids_file.subjects[subject_id].sessions[session_id].scans[current_label].fields['ESS_dataRecordingUuid'] = run['Data Recording UUID']
-                    bids_file.subjects[subject_id].sessions[session_id].scans[current_label].fields['ESS_inSessionRecordingNum'] = run['Filename'][run['Filename'].rfind('_') + 1:run['Filename'].rfind('.')]
+                    bids_file.subjects[subject_id].sessions[session_id].scans[current_label].fields[
+                        'ESS_dataRecordingUuid'] = run['Data Recording UUID']
+                    bids_file.subjects[subject_id].sessions[session_id].scans[current_label].fields[
+                        'ESS_inSessionRecordingNum'] = \
+                        run['Filename'][run['Filename'].rfind('_') + 1:run['Filename'].rfind('.')]
 
                     try:
                         f = open(os.path.join(current_ses_dir, run['Event Instance File']), "r")
@@ -253,11 +255,12 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                         raise e
 
                     if not bids_file.subjects[subject_id].sessions[session_id].electrodes:
-                        if run['Recording Parameter Set Label'] not in RPS_electrodes.keys():
+                        if run['Recording Parameter Set Label'] not in rps_electrodes.keys():
                             print("Extracting electrode set from %s..." % run['Recording Parameter Set Label'])
 
-                            rps_entry = get_matlab_instance().ExtractChannels(run['Filename'], current_ses_dir, nargout=5,
-                                                                      stdout=matlab_out, stderr=matlab_err)
+                            rps_entry = get_matlab_instance().ExtractChannels(run['Filename'],
+                                                                              current_ses_dir, nargout=5,
+                                                                              stdout=matlab_out, stderr=matlab_err)
                             if DISPLAY_MATLAB_OUTPUT:
                                 print(matlab_out.getvalue())
                                 print(matlab_err.getvalue())
@@ -273,23 +276,25 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                                 elif rps_entry[1][i] == 'EKG':
                                     rps_entry[1][i] = 'ECG'
 
-                            RPS_electrodes[run['Recording Parameter Set Label']] = new_rps_entry
+                            rps_electrodes[run['Recording Parameter Set Label']] = new_rps_entry
 
-                        rps_entry = RPS_electrodes[run['Recording Parameter Set Label']]
+                        rps_entry = rps_electrodes[run['Recording Parameter Set Label']]
                         bids_file.subjects[subject_id].sessions[session_id].coordsystem = {
                             'EEGCoordinateSystem': 'RAS',
                             'EEGCoordinateUnits': 'mm'
                         }
 
-                        bids_file.subjects[subject_id].sessions[session_id].fields['legacy_recordingParameterSet'] = run[
-                            'Recording Parameter Set Label']
+                        bids_file.subjects[subject_id].sessions[session_id].fields['legacy_recordingParameterSet'] = \
+                            run['Recording Parameter Set Label']
                         bids_file.subjects[subject_id].field_definitions['legacy_recordingParameterSet'] = \
-                        session_level_tags['legacy_recordingParameterSet']
+                            session_level_tags['legacy_recordingParameterSet']
 
                         for i in range(0, len(rps_entry[0])):
-                            bids_file.subjects[subject_id].sessions[session_id].electrodes[rps_entry[0][i]] = {'x': rps_entry[2][i], 'y': rps_entry[3][i], 'z': rps_entry[4][i]}
+                            bids_file.subjects[subject_id].sessions[session_id].electrodes[rps_entry[0][i]] = \
+                                {'x': rps_entry[2][i], 'y': rps_entry[3][i], 'z': rps_entry[4][i]}
 
-                    for ps_label, ps in [ (psl, ps) for psl, ps in rec_parameter_sets.items() if psl == run['Recording Parameter Set Label']]:
+                    for ps_label, ps in [(psl, ps) for psl, ps in rec_parameter_sets.items()
+                                         if psl == run['Recording Parameter Set Label']]:
                         for modality, mode in ps.items():
                             modality = modality.upper()
                             if modality not in channel_types and modality != 'EKG':
@@ -302,7 +307,8 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                                                                      subject_label=subject_id,
                                                                      session_label=session_id,
                                                                      scan_name=current_label)
-                                bids_file.tasks[task_name].add_field("EEGPlacementScheme", mode['Channel Location Type'] or "n/a",
+                                bids_file.tasks[task_name].add_field("EEGPlacementScheme",
+                                                                     mode['Channel Location Type'] or "n/a",
                                                                      subject_label=subject_id, session_label=session_id,
                                                                      scan_name=current_label)
                                 bids_file.tasks[task_name].add_field("EEGReference", mode['Reference Label'] or "n/a",
@@ -316,7 +322,10 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                                     if channel not in bids_file.field_replacements['channels']:
                                         bids_file.field_replacements['channels'][channel] = list()
 
-                                    has_entry = any(filter(lambda x: x['where']['legacy_recordingParameterSet'] == run['Recording Parameter Set Label'], bids_file.field_replacements['channels'][channel]))
+                                    has_entry = any(filter(lambda x:
+                                                           x['where']['legacy_recordingParameterSet'] ==
+                                                           run['Recording Parameter Set Label'],
+                                                           bids_file.field_replacements['channels'][channel]))
 
                                     if not has_entry:
                                         bids_file.field_replacements['channels'][channel].append(
@@ -332,7 +341,8 @@ def _generate_bids_sessions(bids_file, xml, input_directory):
                                 channels_dict[channel]['type'] = modality
                                 channels_dict[channel]['units'] = 'uV'
                                 channels_dict[channel]['sampling_frequency'] = mode['Sampling Rate']
-                                # stubbed, since all channels have the same reference, so this only goes in the sidecar...channels_dict[channel]['reference'] = mode['Reference Label']
+                                # stubbed, since all channels have the same reference, so this only goes in sidecar.
+                                # ..channels_dict[channel]['reference'] = mode['Reference Label']
 
 
 def _generate_bids_tasks(bids_file, xml):
@@ -360,7 +370,6 @@ def _generate_bids_tasks(bids_file, xml):
             )
 
 
-
 def underscore_to_camelcase(string):
     """
     Rudimentary converter used to make labels BIDS compliant
@@ -381,10 +390,12 @@ def underscore_to_camelcase(string):
     new_string = re.sub(r'\W+', '', new_string)
     return new_string
 
+
 class LXMLDecodeError(Exception):
     """
     Exception that is thrown if there was a decoding error with 'study_description.xml'
     """
+
     def __init__(self, *args, **kwargs):
         if len(args) > 0:
             super().__init__(self, "An error occurred in decoding 'study_description.xml' in %s" % args[0], args[1:],

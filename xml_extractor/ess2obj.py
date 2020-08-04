@@ -23,8 +23,10 @@ def _xml2head(head):
     header_dict['Title'] = head.findtext('title')
     header_dict['Description'] = head.findtext('description')
     header_dict['Funding Organization'] = head.find('project').find('funding').findtext('organization')
+    header_dict['grantId'] = head.find('project').find('funding').findtext('grantId')
     header_dict['UUID'] = head.findtext('uuid')
     header_dict['Root URI'] = head.findtext('rootURI')
+    header_dict['IRB'] = head.findtext('IRB')
 
     # following code accounts for possible missing tags in license
     license_tag = head.find('summary').find('license')
