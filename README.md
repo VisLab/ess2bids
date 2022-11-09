@@ -1,6 +1,6 @@
-# Description
+# Description (DEPRECATED REPOSITORY)
 
-This repository contains scripts that are used to convert [ESS formatted studies](http://www.eegstudy.org/) into [BIDS formatted studies](https://bids.neuroimaging.io/). 
+This repository contains scripts that are used to convert [ESS formatted studies](http://www.eegstudy.org/) into [BIDS formatted studies](https://bids.neuroimaging.io/). This repository was created based on a very early version of BIDS and is no longer being supported.
 
 Created by Jonathan Balraj and Joe Lambeth.
 
